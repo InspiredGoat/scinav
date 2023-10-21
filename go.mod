@@ -1,4 +1,4 @@
-module example.com/m
+module scinav
 
 go 1.21.2
 
