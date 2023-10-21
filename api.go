@@ -32,6 +32,9 @@ func crossref(path string) ([]byte, error) {
 	return bytes, nil
 }
 
+func searchStudy(query string) {
+}
+
 func NewStudyFromDOI(doi string) (*Study, error) {
 	buf, err := crossref("works/" + doi)
 	if err != nil {

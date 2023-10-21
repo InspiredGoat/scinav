@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
+	// rg "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -29,7 +31,7 @@ type Reference struct {
 	ArbitraryOrder string
 }
 
-var studySize = rl.Vector2{X: 200, Y: 160}
+var studySize = rl.Vector2{X: 220, Y: 260}
 
 type Study struct {
 	// extracted
@@ -43,7 +45,8 @@ type Study struct {
 	DOI               string // ^
 
 	// Ai generated
-	Shorthand string
+	AiShorthand string
+	Stage       string
 
 	// user-defined
 	Hearted    bool
@@ -52,11 +55,12 @@ type Study struct {
 	Tags       []int // stores the tags that are enabled
 
 	// drawing
-	TargetOff rl.Vector2 // moves to this target at x speed each frame
-	Off       rl.Vector2 // offsets are relative to parent
-	AbsPos    rl.Vector2 // offsets are relative to parent
-	Selected  bool
-	Dragging  bool
+	TargetOff    rl.Vector2 // moves to this target at x speed each frame
+	Off          rl.Vector2 // offsets are relative to parent
+	AbsPos       rl.Vector2 // offsets are relative to parent
+	DragStartPos rl.Vector2 // offsets are relative to parent
+	Selected     bool
+	Dragging     bool
 
 	Children []*Study
 	Parent   *Study // expanded
@@ -73,17 +77,26 @@ func drawStudy(w *Workspace, s *Study, x int32, y int32) {
 	s.AbsPos.X = float32(x)
 	s.AbsPos.Y = float32(y)
 
+	if s.FilteredIn {
+		rl.DrawRectangle(of_x-5, of_y-5, int32(studySize.X)+5, int32(studySize.Y)+5, rl.Green)
+	}
+
 	if w.Active == s {
-		rl.DrawRectangle(of_x, of_y, int32(studySize.X), int32(studySize.Y), rl.Blue)
+		rl.DrawRectangle(of_x, of_y, int32(studySize.X), int32(studySize.Y), rl.NewColor(200, 200, 200, 255))
 	} else if s.Selected {
-		rl.DrawRectangle(of_x, of_y, int32(studySize.X), int32(studySize.Y), rl.Pink)
+		rl.DrawRectangle(of_x, of_y, int32(studySize.X), int32(studySize.Y), rl.NewColor(220, 220, 220, 255))
 	} else if w.Hot == s {
-		rl.DrawRectangle(of_x, of_y, int32(studySize.X), int32(studySize.Y), rl.Orange)
+		rl.DrawRectangle(of_x, of_y, int32(studySize.X), int32(studySize.Y), rl.NewColor(230, 230, 230, 255))
 	} else {
 		rl.DrawRectangle(of_x, of_y, int32(studySize.X), int32(studySize.Y), rl.White)
 	}
 
-	DrawTextBoxed(s.Title, rl.NewRectangle(float32(of_x+5), float32(of_y+5), studySize.X-5, studySize.Y-5), 16, 1, true, false, 0, 0)
+	title := s.Title
+	if len(s.AiShorthand) > 0 {
+		title = s.AiShorthand
+	}
+
+	DrawTextBoxed(title, rl.NewRectangle(float32(of_x+5), float32(of_y+5), studySize.X-5, studySize.Y-5), 24, 1, true, false, 0, 0)
 
 	// draw children
 	if s.Expanded {
@@ -96,15 +109,20 @@ func drawStudy(w *Workspace, s *Study, x int32, y int32) {
 
 		c_h := studySize.Y + 30*float32(count_valid)
 		for i, c := range s.Children {
-			if c.FilteredIn {
-				n_x := float32(of_x) - studySize.X*2 - 10 + float32(c.Off.X)
-				n_y := float32(of_y) - (studySize.Y / 2) - float32(c_h) + float32(i)*(studySize.Y+15) + float32(c.Off.Y)
+			// if c.FilteredIn {
+			n_x := float32(of_x) - studySize.X*2 - 10 + float32(c.Off.X)
+			n_y := float32(of_y) - (studySize.Y / 2) - float32(c_h) + float32(i)*(studySize.Y+15) + float32(c.Off.Y)
 
-				drawStudy(w, c, int32(n_x), int32(n_y))
-				rl.DrawLineBezier(
-					rl.Vector2{X: float32(of_x), Y: float32(of_y) + float32(studySize.Y/2)},
-					rl.Vector2{X: float32(n_x) + studySize.X, Y: float32(n_y) + float32(studySize.Y/2)}, 2, rl.Gray)
+			color := rl.Gray
+			if c.FilteredIn {
+				color = rl.Green
 			}
+
+			drawStudy(w, c, int32(n_x), int32(n_y))
+			rl.DrawLineBezier(
+				rl.Vector2{X: float32(of_x), Y: float32(of_y) + float32(studySize.Y/2)},
+				rl.Vector2{X: float32(n_x) + studySize.X, Y: float32(n_y) + float32(studySize.Y/2)}, 2, color)
+			// }
 		}
 	}
 }
@@ -128,6 +146,10 @@ func updateStudyUI(w *Workspace, s *Study) {
 		s.Selected = false
 	}
 
+	if s == w.Active && !mouse_is_over && rl.IsMouseButtonReleased(rl.MouseLeftButton) && rl.GetMousePosition().X < float32(rl.GetScreenWidth()-600) {
+		w.Active = nil
+	}
+
 	if s.Selected && rl.IsMouseButtonPressed(rl.MouseLeftButton) {
 		s.Dragging = true
 	}
@@ -149,6 +171,7 @@ func updateStudyUI(w *Workspace, s *Study) {
 
 	if s.Selected && rl.IsKeyPressed(rl.KeyG) {
 		dragStartPos = rl.GetScreenToWorld2D(rl.GetMousePosition(), w.Cam)
+		s.DragStartPos = s.AbsPos
 	}
 	if s.Selected && rl.IsKeyDown(rl.KeyG) {
 		s.TargetOff.X = m_world.X + s.Off.X - s.AbsPos.X - studySize.X/2 // - s.AbsPos.X - studySize.X
@@ -168,12 +191,50 @@ func updateStudyUI(w *Workspace, s *Study) {
 	}
 
 	// regardless of anything try approaching target
-	s.Off.X += (s.TargetOff.X - s.Off.X) * (1 - float32(math.Pow(.5, float64(20.0*rl.GetFrameTime()))))
-	s.Off.Y += (s.TargetOff.Y - s.Off.Y) * (1 - float32(math.Pow(.5, float64(20.0*rl.GetFrameTime()))))
+	s.Off.X += (s.TargetOff.X - s.Off.X) * (1 - float32(math.Pow(.5, float64(23.0*rl.GetFrameTime()))))
+	s.Off.Y += (s.TargetOff.Y - s.Off.Y) * (1 - float32(math.Pow(.5, float64(23.0*rl.GetFrameTime()))))
 
 	if s.Expanded {
 		for _, c := range s.Children {
 			updateStudyUI(w, c)
+		}
+	}
+}
+
+func betterTitles(w *Workspace, s *Study) {
+	go func(s *Study) {
+		response := AIPrompt("Come up with a more concise and practical title for this paper: \"" + s.Title + "\", it was published in " + s.PublicationDate.Format("2006-01-02") + " by the journal " + s.Journal)
+
+		fmt.Println(response)
+		s.AiShorthand = response
+	}(s)
+	if s.Expanded {
+		for _, c := range s.Children {
+			betterTitles(w, c)
+		}
+	}
+}
+
+func filterStudies(w *Workspace, s *Study, filter string, resetFilter bool) {
+
+	if resetFilter {
+		s.FilteredIn = true
+	} else {
+		go func(s *Study) {
+			response := AIPrompt("Here's a filter, does the following data conform to it? \n#FILTER: " + filter + ".\n Your answer should only be the words yes or no. \n#DATA title: \"" + s.Title + "\"\n publish date: " + s.PublicationDate.Format("2006-01-02") + " \njournal author: " + s.Journal + "\nreference count:" + strconv.Itoa(len(s.References)) + "\n times it has been referenced: " + strconv.Itoa(s.IsReferencedCount)))
+
+			fmt.Println(response)
+			if strings.Contains(response, "Yes") {
+				s.FilteredIn = true
+			} else {
+				s.FilteredIn = false
+			}
+		}(s)
+	}
+
+	if s.Expanded {
+		for _, c := range s.Children {
+			filterStudies(w, c, filter, resetFilter)
 		}
 	}
 }
@@ -202,7 +263,7 @@ var panelOff float32 = 100
 func drawInterface(w *Workspace) {
 	// draw rest of UI
 	const searchbarWidth int32 = 500
-	const searchbarHeight int32 = 32
+	const searchbarHeight int32 = 30
 	// check for hot or actrive
 	rect := rl.NewRectangle(float32(rl.GetScreenWidth())/2-float32(searchbarWidth)/2, 10, float32(searchbarWidth), float32(searchbarHeight))
 
@@ -233,9 +294,29 @@ func drawInterface(w *Workspace) {
 			searchString = ""
 			rl.GetKeyPressed()
 		}
+		if rl.IsKeyDown(rl.KeyLeftControl) && rl.IsKeyPressed(rl.KeyV) {
+			searchString = searchString[:searchCurPos] + rl.GetClipboardText() + searchString[searchCurPos:]
+		}
 
 		// do interactive stuff
 		if rl.IsKeyPressed(rl.KeyBackspace) {
+			if len(searchString) > 0 && searchCurPos > 0 {
+				bytes := []byte(searchString)
+				searchString = string(append(bytes[:searchCurPos-1], bytes[searchCurPos:]...))
+
+				searchCurPos -= 1
+				searchCurPos = max(0, searchCurPos)
+			}
+			searchCool = float32(rl.GetTime()) + .1
+		}
+		if rl.IsKeyPressed(rl.KeyRight) {
+			searchCurPos += 1
+			searchCurPos = min(int32(len(searchString)), searchCurPos)
+			searchCool = float32(rl.GetTime()) + .1
+		}
+		if rl.IsKeyPressed(rl.KeyLeft) {
+			searchCurPos -= 1
+			searchCurPos = max(0, searchCurPos)
 			searchCool = float32(rl.GetTime()) + .1
 		}
 
@@ -250,21 +331,41 @@ func drawInterface(w *Workspace) {
 				}
 				searchCool = float32(rl.GetTime()) + .01
 			}
-		}
-
-		if rl.IsKeyPressed(rl.KeyRight) {
-			fmt.Println("LEFT")
-			searchCurPos += 1
-			searchCurPos = min(int32(len(searchString)), searchCurPos)
-		}
-		if rl.IsKeyPressed(rl.KeyLeft) {
-			fmt.Println("LEFT")
-			searchCurPos -= 1
-			searchCurPos = max(0, searchCurPos)
+			if rl.IsKeyDown(rl.KeyRight) {
+				searchCurPos += 1
+				searchCurPos = min(int32(len(searchString)), searchCurPos)
+				searchCool = float32(rl.GetTime()) + .01
+			}
+			if rl.IsKeyDown(rl.KeyLeft) {
+				searchCurPos -= 1
+				searchCurPos = max(0, searchCurPos)
+				searchCool = float32(rl.GetTime()) + .01
+			}
 		}
 
 		if rl.IsKeyPressed(rl.KeyEnter) {
 			// do something with chatgpt for real now
+
+			// do ADD CODE
+			if len(searchString) > 4 {
+				if strings.Compare("ADD", searchString[0:3]) == 0 {
+					fmt.Println(searchString[4:])
+					NewStudyFromDOI(searchString[4:])
+				} else {
+					for _, s := range w.StudiesExpanded {
+						if len(searchString) == 0 {
+							filterStudies(w, s, searchString, true)
+						} else {
+							filterStudies(w, s, searchString, false)
+						}
+					}
+				}
+			}
+			// do FILTERING
+
+			// do ADD SEARCH
+
+			// do TAG
 
 			// give out tags?
 			// filter out irrelevant
@@ -278,39 +379,108 @@ func drawInterface(w *Workspace) {
 			key = rl.GetCharPressed()
 		}
 
-		rl.DrawRectangleRec(rect, rl.Blue)
+		rl.DrawRectangleRec(rect, rl.White)
 	} else if searchHot {
-		rl.DrawRectangleRec(rect, rl.Orange)
+		rl.DrawRectangleRec(rect, rl.White)
 	} else {
 		rl.DrawRectangleRec(rect, rl.White)
 	}
 
+	if rl.IsKeyPressed(rl.KeyG) && rl.IsKeyDown(rl.KeyLeftControl) {
+		for _, s := range w.StudiesExpanded {
+			betterTitles(w, s)
+		}
+	}
+
 	textRect := rect
 	textRect.X += 5
-	textRect.Y += 5
+	textRect.Y += 7
 	textRect.Width -= 5
 	textRect.Height -= 5
-	DrawTextBoxed(searchString, textRect, 24, 1, false, searchActive, searchCurPos, 0)
+	DrawTextBoxed(searchString, textRect, 16, 1, false, searchActive, searchCurPos, 0)
 
 	{
 		// draw menu for selecting
-		const panelWidth = 400
-		var panelOffTarget float32 = panelWidth + 100
+		const panelWidth = 600
+		var panelOffTarget float32 = panelWidth + 10
+
 		if w.Active != nil {
 			panelOffTarget = 0
+		} else {
+			panelOffTarget = panelWidth + 10
 		}
 
-		panelOff += float32(panelOffTarget-(panelOff)) * (1 - float32(math.Pow(.5, float64(15.0*rl.GetFrameTime()))))
+		panelOff += float32(panelOffTarget-(panelOff)) * (1 - float32(math.Pow(.5, float64(25.0*rl.GetFrameTime()))))
+
+		x := int32(rl.GetScreenWidth()) - panelWidth - 10 + int32(panelOff)
+		y := 80
+		rl.DrawRectangle(x, int32(y), panelWidth, int32(rl.GetScreenHeight())-160, rl.White)
+
+		x += 10
 
 		if w.Active != nil {
-			x := int32(rl.GetScreenWidth()) - panelWidth - 10 + int32(panelOff)
-			rl.DrawRectangle(x, 80, panelWidth, int32(rl.GetScreenHeight())-160, rl.White)
 
-			DrawTextBoxed(w.Active.Title, rl.NewRectangle(float32(x)+5, 80+5, panelWidth-10, 60), 24, 1, true, false, 0, 0)
+			title := w.Active.Title
+
+			DrawTextBoxed(title, rl.NewRectangle(float32(x)+5, float32(y+5), panelWidth-10, 80), 24, 1, true, false, 0, 0)
+
+			y += 65
 
 			// tags
 
-			// DrawTextBoxed(w.Active.Authors, rl.NewRectangle(float32(x)+5, 80+5, panelWidth-10, 40), 24, 1, true, false, 0, 0)
+			authors := "by "
+			for i, a := range w.Active.Authors {
+				authors += a
+				if i != len(w.Active.Authors)-1 {
+					authors += ", "
+				}
+			}
+			DrawTextBoxed(authors, rl.NewRectangle(float32(x)+5, float32(y+5), panelWidth-10, 80), 16, 1, true, false, 0, 0)
+
+			{
+				if len(w.Active.Journal) > 3 {
+					y += 25
+					text := "Published by: " + w.Active.Journal
+					DrawTextBoxed(text, rl.NewRectangle(float32(x)+5, float32(y+5), panelWidth-10, 80), 16, 1, true, false, 0, 0)
+				}
+				{
+					if len(w.Active.Journal) > 3 {
+						y += 25
+						text := "Published on: " + w.Active.PublicationDate.Format("2006-01-02")
+						DrawTextBoxed(text, rl.NewRectangle(float32(x)+5, float32(y+5), panelWidth-10, 80), 16, 1, true, false, 0, 0)
+					}
+				}
+				y += 25
+				{
+					text := "Cites: " + strconv.Itoa(len(w.Active.References)) + " other works"
+					DrawTextBoxed(text, rl.NewRectangle(float32(x)+5, float32(y+5), panelWidth-10, 80), 16, 1, true, false, 0, 0)
+				}
+				y += 25
+				{
+					text := "Is cited by: " + strconv.Itoa(int(w.Active.IsReferencedCount)) + " others"
+					DrawTextBoxed(text, rl.NewRectangle(float32(x)+5, float32(y+5), panelWidth-10, 80), 16, 1, true, false, 0, 0)
+				}
+				y += 32
+				{
+					if Button("Open in google scholar", x, int32(y), 16) {
+						DOISanitized := strings.ReplaceAll(w.Active.DOI, "/", "%2F")
+						rl.OpenURL("https://scholar.google.com/scholar?hl=en&as_sdt=0%2C5&q=" + DOISanitized + "&btnG=")
+					}
+				}
+				y += 32
+				{
+					if Button("Open in scihub", x, int32(y), 16) {
+						rl.OpenURL("https://sci-hub.hkvisa.net/" + w.Active.DOI)
+					}
+				}
+
+				y += 32
+				{
+					if Button("Expand citations", x, int32(y), 16) {
+						go w.Active.ExpandChildren()
+					}
+				}
+			}
 		}
 	}
 }
@@ -319,7 +489,7 @@ func main() {
 	fmt.Println("test")
 
 	rl.SetTraceLogLevel(rl.LogNone)
-	rl.InitWindow(800, 800, "testapp")
+	rl.InitWindow(1640, 1024, "testapp")
 	rl.SetConfigFlags(rl.FlagMsaa4xHint)
 	rl.SetWindowState(rl.FlagWindowResizable)
 	defer rl.CloseWindow()
@@ -339,13 +509,18 @@ func main() {
 
 		workspace.StudiesExpanded = append(workspace.StudiesExpanded, s)
 	}(&workspace)
-	DefaultFont = rl.LoadFontEx("Roboto-Medium.ttf", 48, nil)
+	DefaultFont = rl.LoadFontEx("Roboto-Medium.ttf", 32, nil)
+	rl.SetTextureFilter(DefaultFont.Texture, rl.FilterBilinear)
 
 	rl.SetTargetFPS(60)
 
 	for !rl.WindowShouldClose() {
 
 		// check for collision, if no collision move background basically
+
+		if rl.IsFileDropped() {
+
+		}
 
 		if rl.IsMouseButtonDown(rl.MouseRightButton) {
 			workspace.Cam.Target.X -= rl.GetMouseDelta().X / workspace.Cam.Zoom
@@ -390,4 +565,5 @@ func main() {
 
 		rl.EndDrawing()
 	}
+
 }

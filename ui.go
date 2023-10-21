@@ -143,12 +143,12 @@ func DrawTextBoxed(text string, rec rl.Rectangle, size float32, spacing float32,
 		} else {
 			if codepoint == '\n' {
 				if !wordWrap {
-					textOffsetY += float32(DefaultFont.BaseSize+DefaultFont.BaseSize/2) * scaleFactor
+					textOffsetY += float32(DefaultFont.BaseSize+DefaultFont.BaseSize/3) * scaleFactor
 					textOffsetX = 0
 				}
 			} else {
 				if !wordWrap && ((textOffsetX + glyphWidth) > rec.Width) {
-					textOffsetY += float32(DefaultFont.BaseSize+DefaultFont.BaseSize/2) * scaleFactor
+					textOffsetY += float32(DefaultFont.BaseSize+DefaultFont.BaseSize/3) * scaleFactor
 					textOffsetX = 0
 				}
 
@@ -202,4 +202,24 @@ func DrawTextBoxed(text string, rec rl.Rectangle, size float32, spacing float32,
 	if drawCursor && selectStart == int32(len(text)) {
 		rl.DrawRectangleRec(rl.NewRectangle(rec.X+textOffsetX-1, rec.Y+textOffsetY, spacing*2, float32(DefaultFont.BaseSize)*scaleFactor), rl.Black)
 	}
+}
+
+func Button(text string, x int32, y int32, textHeight float32) bool {
+	width := rl.MeasureTextEx(DefaultFont, text, textHeight, 1).X + 10
+	hover := rl.CheckCollisionPointRec(rl.GetMousePosition(), rl.NewRectangle(float32(x), float32(y), width, textHeight+10))
+	res := false
+	bg := rl.NewColor(200, 200, 200, 255)
+
+	if hover {
+		if rl.IsMouseButtonReleased(rl.MouseLeftButton) {
+			bg = rl.NewColor(100, 100, 100, 255)
+			res = true
+		} else {
+			bg = rl.NewColor(150, 150, 150, 255)
+		}
+	}
+
+	rl.DrawRectangle(x, y, int32(width), int32(textHeight+10), bg)
+	DrawText(text, float32(x)+5, float32(y)+5, textHeight)
+	return res
 }
