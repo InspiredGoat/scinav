@@ -96,16 +96,20 @@ func drawStudy(w *Workspace, s *Study, x int32, y int32) {
 
 		c_h := studySize.Y + 30*float32(count_valid)
 		for i, c := range s.Children {
-			n_x := float32(of_x) - studySize.X*2 - 10 + float32(c.Off.X)
-			n_y := float32(of_y) - (studySize.Y / 2) - float32(c_h) + float32(i)*(studySize.Y+15) + float32(c.Off.Y)
+			if c.FilteredIn {
+				n_x := float32(of_x) - studySize.X*2 - 10 + float32(c.Off.X)
+				n_y := float32(of_y) - (studySize.Y / 2) - float32(c_h) + float32(i)*(studySize.Y+15) + float32(c.Off.Y)
 
-			drawStudy(w, c, int32(n_x), int32(n_y))
-			rl.DrawLineBezier(
-				rl.Vector2{X: float32(of_x), Y: float32(of_y) + float32(studySize.Y/2)},
-				rl.Vector2{X: float32(n_x) + studySize.X, Y: float32(n_y) + float32(studySize.Y/2)}, 2, rl.Gray)
+				drawStudy(w, c, int32(n_x), int32(n_y))
+				rl.DrawLineBezier(
+					rl.Vector2{X: float32(of_x), Y: float32(of_y) + float32(studySize.Y/2)},
+					rl.Vector2{X: float32(n_x) + studySize.X, Y: float32(n_y) + float32(studySize.Y/2)}, 2, rl.Gray)
+			}
 		}
 	}
 }
+
+var dragStartPos rl.Vector2
 
 func updateStudyUI(w *Workspace, s *Study) {
 	m_p := rl.GetMousePosition()
@@ -143,6 +147,9 @@ func updateStudyUI(w *Workspace, s *Study) {
 		}
 	}
 
+	if s.Selected && rl.IsKeyPressed(rl.KeyG) {
+		dragStartPos = rl.GetScreenToWorld2D(rl.GetMousePosition(), w.Cam)
+	}
 	if s.Selected && rl.IsKeyDown(rl.KeyG) {
 		s.TargetOff.X = m_world.X + s.Off.X - s.AbsPos.X - studySize.X/2 // - s.AbsPos.X - studySize.X
 		s.TargetOff.Y = m_world.Y + s.Off.Y - s.AbsPos.Y - studySize.Y/2 // - studySize.Y
@@ -152,7 +159,6 @@ func updateStudyUI(w *Workspace, s *Study) {
 		if rl.IsMouseButtonReleased(rl.MouseLeftButton) {
 			// active
 			w.Active = s
-			s.Selected = true
 		} else if w.Active != s {
 			// hot
 			w.Hot = s
