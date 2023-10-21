@@ -11,8 +11,6 @@ import (
 )
 
 func crossref(path string) ([]byte, error) {
-	//
-
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.crossref.org/"+path, nil)
 	if err != nil {
@@ -85,6 +83,10 @@ func NewStudyFromBytes(buf []byte) *Study {
 }
 
 func (s *Study) ExpandChildren() {
+	if s.Expanded {
+		return
+	}
+
 	wg := new(sync.WaitGroup)
 
 	for _, r := range s.References {
@@ -107,4 +109,5 @@ func (s *Study) ExpandChildren() {
 	}
 
 	wg.Wait()
+	s.Expanded = true
 }
