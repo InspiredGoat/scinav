@@ -1,0 +1,4 @@
+github.com/buger/jsonparser v1.1.1 h1:2PnMjfWD7wBILjqQbt530v576A/cAbQvEW9gGIpYMUs=
+github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
+github.com/gen2brain/raylib-go/raylib v0.0.0-20231021084536-02654bd48c83 h1:7mWBblayicwXnpbskwBAqL2TacXy9/LucwUmySyOvUM=
+github.com/gen2brain/raylib-go/raylib v0.0.0-20231021084536-02654bd48c83/go.mod h1:AwtGA3aTtYdezNxEVbfchaLw/z+CuRDh2Mlxy0FbBro=
