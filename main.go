@@ -12,8 +12,10 @@ import (
 
 type Workspace struct {
 	Cam             rl.Camera2D
-	StudiesExpanded []*Study // root studies
-	StudiesFiltered []*Study // root studies with filtered removed
+	StudiesExpanded []Study // root studies
+	StudiesFiltered []Study // root studies with filtered removed
+
+	RootStudies []*Study
 
 	Hot    *Study
 	Active *Study
@@ -44,18 +46,27 @@ type Study struct {
 	// user-defined
 	Selected bool
 	Expanded bool
-	Tags     []int      // stores the tags that are enabled
-	Off      rl.Vector2 // offsets are relative to parent
+	Tags     []int // stores the tags that are enabled
+
+	// drawing
+	TargetOff rl.Vector2 // moves to this target at x speed each frame
+	Off       rl.Vector2 // offsets are relative to parent
 
 	Children []*Study
 	Parent   *Study // expanded
 }
 
 // all canvas code goes here
+
 func drawCanvas(w *Workspace) {
 	// draw studies as graph
-	rl.DrawRectangleRounded(rl.NewRectangle(400, 400, 200, 320), .2, 32, rl.White)
-	rl.DrawRectangleRounded(rl.NewRectangle(400, 400, 200, 20), .2, 32, rl.Gray)
+
+	for _, root := range w.StudiesExpanded {
+		// bfs traversal?
+		root
+		// rl.DrawRectangleRounded(rl.NewRectangle(400, 400, 200, 320), .2, 32, rl.White)
+		// rl.DrawRectangleRounded(rl.NewRectangle(400, 400, 200, 20), .2, 32, rl.Gray)
+	}
 }
 
 // draws everything on top of canvas
@@ -69,19 +80,28 @@ func drawInterface(w *Workspace) {
 }
 
 func main() {
+	// s2, _ := NewStudyFromDOI("10.2514/6.2005-4282")
+	// // for _, r := range s2.References {
+	// // 	// fmt.Println(r.Key)
+	// // 	// fmt.Println(r.ArbitraryOrder)
+	// // 	// fmt.Println(r.Unstructured)
+	// // 	// fmt.Println(r.DOI)
+	// // }
+	// fmt.Println(s2.Title)
 
-	s2 := NewStudyFromDOI("10.2514/6.2005-4282")
-	for _, r := range s2.References {
-		fmt.Println(r.Key)
-		fmt.Println(r.ArbitraryOrder)
-		fmt.Println(r.Unstructured)
-		fmt.Println(r.DOI)
-	}
-	fmt.Println(s2.Authors)
+	// s2.ExpandChildren()
 
-	if true {
-		return
-	}
+	// for _, r := range s2.Children {
+	// 	fmt.Println(r.Title)
+	// 	fmt.Println(r.Authors)
+	// 	fmt.Println("---")
+	// }
+
+	// if true {
+	// 	return
+	// }
+
+	fmt.Println("test")
 
 	rl.SetTraceLogLevel(rl.LogNone)
 	rl.InitWindow(800, 800, "testapp")
@@ -94,7 +114,7 @@ func main() {
 	//search := b.String()
 
 	var workspace Workspace
-	s := new(Study)
+	var s Study
 	s.Off.X = 400
 	s.Off.Y = 400
 	workspace.Cam.Zoom = 1

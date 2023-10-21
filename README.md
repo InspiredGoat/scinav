@@ -9,8 +9,9 @@ Uses crosref for finding studies and
 
 # TODO
 --- mvp
+- "filter"
+- "ai filters"
 - use api to search papers
-- api to search citations
 - Basic GUI setup
 - GPT rankings
 - searchboxes
@@ -36,3 +37,5 @@ Uses crosref for finding studies and
 
 # Done
 - parse with APA
+- api to search citations
+- api to expand children

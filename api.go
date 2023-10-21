@@ -4,18 +4,26 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	jp "github.com/buger/jsonparser"
 )
 
-func crossref(path string) []byte {
+func crossref(path string) ([]byte, error) {
 	//
 
 	client := &http.Client{}
-	req, _ := http.NewRequest("GET", "https://api.crossref.org/"+path, nil)
+	req, err := http.NewRequest("GET", "https://api.crossref.org/"+path, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	req.Header.Set("User-Agent", "Hackathon Demo (https://github.com/InspiredGoat; mailto:tomd@airmail.cc)")
-	res, _ := client.Do(req)
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
 
 	buf := new(bytes.Buffer)
 	defer res.Body.Close()
@@ -23,26 +31,26 @@ func crossref(path string) []byte {
 	buf.ReadFrom(res.Body)
 	bytes := buf.Bytes()
 
-	return bytes
+	return bytes, nil
 }
 
-func NewStudyFromDOI(doi string) *Study {
-	buf := crossref("works/" + doi)
-	return NewStudyFromBytes(buf)
+func NewStudyFromDOI(doi string) (*Study, error) {
+	buf, err := crossref("works/" + doi)
+	if err != nil {
+		return nil, err
+	} else {
+		return NewStudyFromBytes(buf), nil
+	}
 }
 
 func NewStudyFromBytes(buf []byte) *Study {
 	s := new(Study)
 
-	jp.ArrayEach(buf, func(value []byte, dataType jp.ValueType, offset int, err error) {
-		s.Title, _ = jp.GetString(value)
-	}, "message", "title")
-	jp.ArrayEach(buf, func(value []byte, dataType jp.ValueType, offset int, err error) {
-		given, err := jp.GetString(value, "given")
-		if err != nil {
-			fmt.Println(err.Error())
-		}
+	s.Title, _ = jp.GetString(buf, "message", "title", "[0]")
+	s.Subtitle, _ = jp.GetString(buf, "message", "subtitle", "[0]")
 
+	jp.ArrayEach(buf, func(value []byte, dataType jp.ValueType, offset int, err error) {
+		given, _ := jp.GetString(value, "given")
 		family, _ := jp.GetString(value, "family")
 		s.Authors = append(s.Authors, family+" "+given)
 	}, "message", "author")
@@ -77,22 +85,26 @@ func NewStudyFromBytes(buf []byte) *Study {
 }
 
 func (s *Study) ExpandChildren() {
+	wg := new(sync.WaitGroup)
+
 	for _, r := range s.References {
-		if len(r.DOI) > 4 {
-			// fetch it and add to children
-		}
+		wg.Add(1)
+		go func(s *Study, r Reference, wg *sync.WaitGroup) {
+			defer wg.Done()
+			if len(r.DOI) > 4 {
+				// fetch it and add to children
+				s_child, err := NewStudyFromDOI(r.DOI)
+
+				if err != nil {
+					fmt.Println("Couldn't expand child, because of error in fetching new study")
+					fmt.Println(err.Error())
+				} else {
+					s_child.Parent = s
+					s.Children = append(s.Children, s_child)
+				}
+			}
+		}(s, r, wg)
 	}
 
-}
-
-func fuckyoustub() {
-	buf := crossref("works?query=petrol&rows=100")
-
-	jp.ArrayEach(buf, func(value []byte, dataType jp.ValueType, offset int, err error) {
-		fmt.Println(jp.GetString(value, "abstract"))
-
-		jp.ArrayEach(buf, func(value []byte, dataType jp.ValueType, offset int, err error) {
-			fmt.Println(jp.GetString(value, "abstract"))
-		}, "author")
-	}, "message", "items")
+	wg.Wait()
 }
