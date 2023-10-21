@@ -46,9 +46,10 @@ type Study struct {
 	Shorthand string
 
 	// user-defined
-	Hearted  bool
-	Expanded bool
-	Tags     []int // stores the tags that are enabled
+	Hearted    bool
+	FilteredIn bool
+	Expanded   bool
+	Tags       []int // stores the tags that are enabled
 
 	// drawing
 	TargetOff rl.Vector2 // moves to this target at x speed each frame
@@ -86,7 +87,14 @@ func drawStudy(w *Workspace, s *Study, x int32, y int32) {
 
 	// draw children
 	if s.Expanded {
-		c_h := studySize.Y + 30*float32(len(s.Children))
+		count_valid := 0
+		for _, c := range s.Children {
+			if c.FilteredIn {
+				count_valid++
+			}
+		}
+
+		c_h := studySize.Y + 30*float32(count_valid)
 		for i, c := range s.Children {
 			n_x := float32(of_x) - studySize.X*2 - 10 + float32(c.Off.X)
 			n_y := float32(of_y) - (studySize.Y / 2) - float32(c_h) + float32(i)*(studySize.Y+15) + float32(c.Off.Y)
@@ -118,6 +126,10 @@ func updateStudyUI(w *Workspace, s *Study) {
 
 	if s.Selected && rl.IsMouseButtonPressed(rl.MouseLeftButton) {
 		s.Dragging = true
+	}
+
+	if s.Selected && rl.IsKeyPressed(rl.KeyD) && rl.IsKeyDown(rl.KeyLeftControl) {
+		s.FilteredIn = false
 	}
 
 	if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
@@ -298,27 +310,6 @@ func drawInterface(w *Workspace) {
 }
 
 func main() {
-	// s2, _ := NewStudyFromDOI("10.2514/6.2005-4282")
-	// // for _, r := range s2.References {
-	// // 	// fmt.Println(r.Key)
-	// // 	// fmt.Println(r.ArbitraryOrder)
-	// // 	// fmt.Println(r.Unstructured)
-	// // 	// fmt.Println(r.DOI)
-	// // }
-	// fmt.Println(s2.Title)
-
-	// s2.ExpandChildren()
-
-	// for _, r := range s2.Children {
-	// 	fmt.Println(r.Title)
-	// 	fmt.Println(r.Authors)
-	// 	fmt.Println("---")
-	// }
-
-	// if true {
-	// 	return
-	// }
-
 	fmt.Println("test")
 
 	rl.SetTraceLogLevel(rl.LogNone)

@@ -44,6 +44,7 @@ func NewStudyFromDOI(doi string) (*Study, error) {
 func NewStudyFromBytes(buf []byte) *Study {
 	s := new(Study)
 
+	s.FilteredIn = true
 	s.Title, _ = jp.GetString(buf, "message", "title", "[0]")
 	s.Subtitle, _ = jp.GetString(buf, "message", "subtitle", "[0]")
 
