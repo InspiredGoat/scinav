@@ -1,6 +1,9 @@
 # Scinav
 A butter-smooth gui for finding and tagging studies.
-Uses crosref for finding studies and 
+Uses crosref for finding studies and references.
+
+Video demo:
+[![YouTube](http://i.ytimg.com/vi/xldukDrzx_4/hqdefault.jpg)](https://www.youtube.com/watch?v=xldukDrzx_4)
 
 # Remember
 - try looking for type "standard" in crossref
